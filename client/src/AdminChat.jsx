@@ -3,60 +3,76 @@ import io from "socket.io-client";
 
 const socket = io("http://localhost:5000");
 
-export default function AdminChat() {
+export default function AdminChat({ socket: propSocket, userId, role }) {
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [activeUsers, setActiveUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const messagesEndRef = useRef(null);
   const [isMobileView, setIsMobileView] = useState(false);
+  const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
   useEffect(() => {
-    // Set initial mobile view state
-    const handleResize = () => {
-      setIsMobileView(window.innerWidth < 768);
-    };
-    
-    // Initialize on mount
+    const handleResize = () => setIsMobileView(window.innerWidth < 768);
     handleResize();
-    
-    // Add listener for window resize
     window.addEventListener("resize", handleResize);
-    
-    // Socket initialization
-    socket.emit("join", { userId: "admin", role: "admin" });
 
-    socket.on("activeUsers", (users) => {
-      setActiveUsers(users.filter((user) => user !== "admin"));
+    const currentSocket = propSocket || socket;
+    if (!userId || !role) {
+      console.error(`Invalid props for AdminChat: userId=${userId}, role=${role}`);
+      return;
+    }
+    console.log(`Admin ${userId} joining with role ${role}`);
+    currentSocket.emit("join", { userId, role });
+
+    currentSocket.on("activeUsersForAdmin", (users) => {
+      console.log(`Received activeUsersForAdmin: ${JSON.stringify(users)}`);
+      setActiveUsers(Array.isArray(users) ? users : []);
     });
 
-    socket.on("loadMessages", (loadedMessages) => setMessages(loadedMessages));
-    socket.on("receiveMessage", (msg) => setMessages((prev) => [...prev, msg]));
+    currentSocket.on("allUsers", (users) => {
+      console.log(`Received allUsers: ${JSON.stringify(users)}`);
+      setAllUsers(Array.isArray(users) ? users : []);
+    });
+
+    currentSocket.on("loadMessages", (loadedMessages) => {
+      console.log(`Received loadMessages: ${loadedMessages.length} messages`);
+      setMessages(loadedMessages || []);
+    });
+
+    currentSocket.on("receiveMessage", (msg) => {
+      console.log(`Received message: ${JSON.stringify(msg)}`);
+      setMessages((prev) => [...prev, msg]);
+    });
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      socket.off("activeUsers");
-      socket.off("loadMessages");
-      socket.off("receiveMessage");
+      currentSocket.off("activeUsersForAdmin");
+      currentSocket.off("allUsers");
+      currentSocket.off("loadMessages");
+      currentSocket.off("receiveMessage");
     };
-  }, []);
+  }, [userId, role, propSocket]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    console.log(`Active users updated: ${JSON.stringify(activeUsers)}`);
+  }, [messages, activeUsers]);
 
   const sendMessage = () => {
     if (!message.trim() || !selectedUser) return;
-    const newMessage = { sender: "admin", recipient: selectedUser, message };
-    setMessages((prev) => [...prev, newMessage]);
-    socket.emit("sendMessage", newMessage);
+    const newMessage = { sender: userId, recipient: selectedUser, message };
+    console.log(`Sending message from ${userId} to ${selectedUser}: ${message}`);
+    (propSocket || socket).emit("sendMessage", newMessage);
     setMessage("");
   };
+
+  const usersToDisplay = showOnlineOnly ? activeUsers : allUsers;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-gray-100 p-1 sm:p-2 md:p-4">
       <div className="w-full max-w-screen-xl h-full md:h-[90vh] bg-white shadow-lg rounded-lg flex flex-col">
-        {/* Header */}
         <div className="p-2 sm:p-3 md:p-4 border-b bg-gray-200 text-base sm:text-lg font-bold text-center relative flex items-center justify-center">
           {selectedUser && isMobileView && (
             <button
@@ -74,35 +90,40 @@ export default function AdminChat() {
           </span>
         </div>
 
-        {/* Chat Layout */}
         <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
-          {/* Sidebar (User List) - Hidden on mobile when user is selected */}
           <div
             className={`md:w-1/3 lg:w-1/4 border-r bg-gray-50 overflow-hidden flex-shrink-0 transition-all duration-300 ${
               selectedUser && isMobileView ? "h-0 md:h-auto" : "h-auto"
             }`}
           >
             <div className="p-2 sm:p-3 md:p-4 h-full overflow-auto">
-              <h2 className="text-sm sm:text-md font-semibold mb-2">Active Users</h2>
-              {activeUsers.length === 0 ? (
-                <p className="text-gray-500 text-xs sm:text-sm">No active users</p>
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-sm sm:text-md font-semibold">User Contacts</h2>
+                <div className="flex items-center">
+                  <label className="text-xs sm:text-sm mr-2">Online only</label>
+                  <input
+                    type="checkbox"
+                    checked={showOnlineOnly}
+                    onChange={() => setShowOnlineOnly(!showOnlineOnly)}
+                    className="w-4 h-4"
+                  />
+                </div>
+              </div>
+              {usersToDisplay.length === 0 ? (
+                <p className="text-gray-500 text-xs sm:text-sm">No users found</p>
               ) : (
                 <div className="space-y-1 sm:space-y-2">
-                  {activeUsers.map((user) => (
+                  {usersToDisplay.map((user) => (
                     <div
                       key={user}
                       className={`p-2 sm:p-3 cursor-pointer rounded-lg flex items-center transition ${
-                        selectedUser === user
-                          ? "bg-blue-500 text-white"
-                          : "hover:bg-gray-200"
+                        selectedUser === user ? "bg-blue-500 text-white" : "hover:bg-gray-200"
                       }`}
                       onClick={() => setSelectedUser(user)}
                     >
                       <span
                         className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-2 ${
-                          activeUsers.includes(user)
-                            ? "bg-green-500"
-                            : "bg-gray-400"
+                          activeUsers.includes(user) ? "bg-green-500" : "bg-gray-400"
                         }`}
                       ></span>
                       <span className="truncate text-sm sm:text-base">{user}</span>
@@ -113,7 +134,6 @@ export default function AdminChat() {
             </div>
           </div>
 
-          {/* Chat Window - Hidden on mobile when no user selected */}
           <div
             className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
               !selectedUser && isMobileView ? "h-0 md:h-auto" : "h-auto"
@@ -121,40 +141,36 @@ export default function AdminChat() {
           >
             <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3">
               {selectedUser ? (
-                messages
-                  .filter(
+                (() => {
+                  const filteredMessages = messages.filter(
                     (msg) =>
-                      msg.sender === selectedUser || msg.recipient === selectedUser
-                  )
-                  .map((msg, index) => (
+                      (msg.sender === selectedUser && msg.recipient === userId) ||
+                      (msg.recipient === selectedUser && msg.sender === userId)
+                  );
+                  console.log(`Filtered messages for ${selectedUser}:`, filteredMessages);
+                  return filteredMessages.map((msg, index) => (
                     <div
-                      key={index}
-                      className={`flex ${
-                        msg.sender === "admin" ? "justify-end" : "justify-start"
-                      }`}
+                      key={msg.timestamp + msg.sender}
+                      className={`flex ${msg.sender === userId ? "justify-end" : "justify-start"}`}
                     >
                       <div
                         className={`max-w-[85%] p-2 sm:p-3 rounded-lg shadow-md break-words ${
-                          msg.sender === "admin"
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-300 text-black"
+                          msg.sender === userId ? "bg-blue-500 text-white" : "bg-gray-300 text-black"
                         }`}
                       >
                         <p className="text-xs sm:text-sm md:text-base">{msg.message}</p>
                       </div>
                     </div>
-                  ))
+                  ));
+                })()
               ) : (
                 <div className="hidden md:flex items-center justify-center h-full">
-                  <p className="text-gray-500 text-center">
-                    Select a user to start chatting
-                  </p>
+                  <p className="text-gray-500 text-center">Select a user to start chatting</p>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Box */}
             {selectedUser && (
               <div className="p-2 sm:p-3 md:p-4 border-t bg-gray-50">
                 <div className="flex gap-1 sm:gap-2">

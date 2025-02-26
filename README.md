@@ -32,7 +32,7 @@ cd chatapp-node-socketio-mysql-react
 ```
 3. Install dependencies:
 ```bash
-npm run install
+npm run build
 ```
 This will install dependencies in the root directory, client directory, and build the client-side code.
 4. Start the server:

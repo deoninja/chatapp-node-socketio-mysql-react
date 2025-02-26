@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "install": "npm install && (cd client && npm install && npm run build) && cd ..",
+    "build": "npm install && (cd client && npm install && npm run build) && cd ..",
     "start": "node server.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Deo Trinidad",
   "license": "ISC",
-  "description": "",
+  "description": "A simple chat application using Node.js, Socket.io, and MySQL",
   "dependencies": {
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
