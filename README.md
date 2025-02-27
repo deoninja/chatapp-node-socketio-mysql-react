@@ -22,6 +22,39 @@ This is a Node.js project that uses Express.js as the server-side framework and 
 
 ### Instructions
 
+# Database Setup
+
+## Create Database and Tables
+
+To set up the database for the chat app, run the following SQL commands:
+
+```sql
+CREATE DATABASE chat_db;
+USE chat_db;
+
+CREATE TABLE users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255) NOT NULL,
+  role ENUM('admin', 'user') NOT NULL
+);
+
+CREATE TABLE messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sender VARCHAR(255),
+  recipient VARCHAR(255),
+  message TEXT,
+  is_read BOOLEAN DEFAULT FALSE,
+  read_at TIMESTAMP NULL DEFAULT NULL,
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add sample admin and users
+INSERT INTO users (username, role) VALUES 
+('admin', 'admin'),
+('user1', 'user'),
+('user2', 'user');
+
+
 1. Clone the repository to your local machine:
 ```bash
 git clone https://github.com/deoninja/chatapp-node-socketio-mysql-react.git
@@ -35,6 +68,7 @@ cd chatapp-node-socketio-mysql-react
 npm run build
 ```
 This will install dependencies in the root directory, client directory, and build the client-side code.
+
 4. Start the server:
 ```bash
 npm start

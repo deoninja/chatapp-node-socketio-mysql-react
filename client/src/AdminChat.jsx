@@ -155,7 +155,7 @@ export default function AdminChat({ socket: propSocket, userId, role }) {
                     >
                       <div
                         className={`max-w-[85%] p-2 sm:p-3 rounded-lg shadow-md break-words ${
-                          msg.sender === userId ? "bg-blue-500 text-white" : "bg-gray-300 text-black"
+                          msg.sender === userId ? "bg-blue-500 text-white rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[15px] rounded-br-[0px]" : "bg-gray-300 text-black rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[0px] rounded-br-[15px]"
                         }`}
                       >
                         <p className="text-xs sm:text-sm md:text-base">{msg.message}</p>
