@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import io from "socket.io-client";
+import { formatTimestamp } from './utils/formatTimestamp';
 
 const socket = io("http://localhost:5000");
 
@@ -72,7 +73,8 @@ export default function UserChat({ socket: propSocket, userId, role }) {
 
   const sendMessage = () => {
     if (!message.trim() || !selectedAdmin) return;
-    const newMessage = { sender: userId, recipient: selectedAdmin, message };
+    const timestamp = new Date().toISOString();
+    const newMessage = { sender: userId, recipient: selectedAdmin, message, timestamp };
     console.log(`Sending message from ${userId} to ${selectedAdmin}: ${message}`);
     (propSocket || socket).emit("sendMessage", newMessage);
     setMessage("");
@@ -144,25 +146,53 @@ export default function UserChat({ socket: propSocket, userId, role }) {
           >
             <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3">
               {selectedAdmin && messages.length > 0 ? (
+                // (() => {
+                //   const filteredMessages = messages.filter(
+                //     (msg) =>
+                //       (msg.sender === selectedAdmin && msg.recipient === userId) ||
+                //       (msg.recipient === selectedAdmin && msg.sender === userId)
+                //   );
+                //   console.log(`Filtered messages for ${selectedAdmin}:`, filteredMessages);
+                //   return filteredMessages.map((msg, index) => (
+                //     <div
+                //       key={msg.timestamp + msg.sender}
+                //       className={`flex ${msg.sender === userId ? "justify-end" : "justify-start"}`}
+                //     >
+                //       <div
+                //         className={`max-w-[85%] p-2 sm:p-3 rounded-lg shadow-md break-words ${
+                //           msg.sender === userId ? "bg-blue-500 text-white" : "bg-gray-300 text-black"
+                //         }`}
+                //       >
+                //         <p className="text-xs sm:text-sm md:text-base">{msg.message}</p>
+                //       </div>
+                //     </div>
+                //   ));
+                // })()
                 (() => {
-                  const filteredMessages = messages.filter(
-                    (msg) =>
-                      (msg.sender === selectedAdmin && msg.recipient === userId) ||
-                      (msg.recipient === selectedAdmin && msg.sender === userId)
-                  );
-                  console.log(`Filtered messages for ${selectedAdmin}:`, filteredMessages);
-                  return filteredMessages.map((msg, index) => (
+                  const filteredMessages = messages
+                    .filter(
+                      (msg) =>
+                        (msg.sender === selectedAdmin && msg.recipient === userId) ||
+                        (msg.recipient === selectedAdmin && msg.sender === userId)
+                    )
+                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); // Sort by timestamp
+
+                  console.log(`Filtered and sorted messages for ${selectedAdmin}:`, filteredMessages);
+                  return filteredMessages.map((msg) => (
                     <div
                       key={msg.timestamp + msg.sender}
-                      className={`flex ${msg.sender === userId ? "justify-end" : "justify-start"}`}
+                      className={`flex flex-col ${msg.sender === userId ? "items-end" : "items-start"}`}
                     >
                       <div
                         className={`max-w-[85%] p-2 sm:p-3 rounded-lg shadow-md break-words ${
-                          msg.sender === userId ? "bg-blue-500 text-white rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[15px] rounded-br-[0px]" : "bg-gray-300 text-black rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[0px] rounded-br-[15px]"
+                          msg.sender === userId
+                            ? "bg-blue-500 text-white rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[15px] rounded-br-[0px]"
+                            : "bg-gray-300 text-black rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[0px] rounded-br-[15px]"
                         }`}
                       >
                         <p className="text-xs sm:text-sm md:text-base">{msg.message}</p>
                       </div>
+                      <p className="text-xs text-gray-500 mt-1">{formatTimestamp(msg.timestamp)}</p>
                     </div>
                   ));
                 })()

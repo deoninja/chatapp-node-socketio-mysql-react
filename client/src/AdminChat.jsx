@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import io from "socket.io-client";
+import { formatTimestamp } from './utils/formatTimestamp';
 
 const socket = io("http://localhost:5000");
 
@@ -62,11 +63,14 @@ export default function AdminChat({ socket: propSocket, userId, role }) {
 
   const sendMessage = () => {
     if (!message.trim() || !selectedUser) return;
-    const newMessage = { sender: userId, recipient: selectedUser, message };
-    console.log(`Sending message from ${userId} to ${selectedUser}: ${message}`);
+    const timestamp = new Date().toISOString(); // Use ISO format for consistency
+    const newMessage = { sender: userId, recipient: selectedUser, message, timestamp };
+    console.log(`Sending message from ${userId} to ${selectedUser}: ${message} at ${timestamp}`);
     (propSocket || socket).emit("sendMessage", newMessage);
+    setMessages((prev) => [...prev, newMessage]); // Add to local state immediately
     setMessage("");
   };
+
 
   const usersToDisplay = showOnlineOnly ? activeUsers : allUsers;
 
@@ -80,8 +84,17 @@ export default function AdminChat({ socket: propSocket, userId, role }) {
               className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-300 transition"
               aria-label="Back to user list"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
               </svg>
             </button>
           )}
@@ -142,24 +155,30 @@ export default function AdminChat({ socket: propSocket, userId, role }) {
             <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3">
               {selectedUser ? (
                 (() => {
-                  const filteredMessages = messages.filter(
-                    (msg) =>
-                      (msg.sender === selectedUser && msg.recipient === userId) ||
-                      (msg.recipient === selectedUser && msg.sender === userId)
-                  );
-                  console.log(`Filtered messages for ${selectedUser}:`, filteredMessages);
-                  return filteredMessages.map((msg, index) => (
+                  const filteredMessages = messages
+                    .filter(
+                      (msg) =>
+                        (msg.sender === selectedUser && msg.recipient === userId) ||
+                        (msg.recipient === selectedUser && msg.sender === userId)
+                    )
+                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); // Sort by timestamp
+
+                  console.log(`Filtered and sorted messages for ${selectedUser}:`, filteredMessages);
+                  return filteredMessages.map((msg) => (
                     <div
                       key={msg.timestamp + msg.sender}
-                      className={`flex ${msg.sender === userId ? "justify-end" : "justify-start"}`}
+                      className={`flex flex-col ${msg.sender === userId ? "items-end" : "items-start"}`}
                     >
                       <div
                         className={`max-w-[85%] p-2 sm:p-3 rounded-lg shadow-md break-words ${
-                          msg.sender === userId ? "bg-blue-500 text-white rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[15px] rounded-br-[0px]" : "bg-gray-300 text-black rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[0px] rounded-br-[15px]"
+                          msg.sender === userId
+                            ? "bg-blue-500 text-white rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[15px] rounded-br-[0px]"
+                            : "bg-gray-300 text-black rounded-tl-[15px] rounded-tr-[15px] rounded-bl-[0px] rounded-br-[15px]"
                         }`}
                       >
                         <p className="text-xs sm:text-sm md:text-base">{msg.message}</p>
                       </div>
+                      <p className="text-xs text-gray-500 mt-1">{formatTimestamp(msg.timestamp)}</p>
                     </div>
                   ));
                 })()
