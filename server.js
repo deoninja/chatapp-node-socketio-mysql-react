@@ -1,3 +1,4 @@
+// index.js
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -6,6 +7,7 @@ const mysql = require("mysql");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const path = require("path");
+const userRoutes = require('./routes/userRoutes');
 
 const pHost = process.env.PUBLIC_HOST;
 
@@ -17,6 +19,7 @@ app.use(cors({ origin: pHost, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "client", "dist")));
+app.use('/api/users', userRoutes);
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
@@ -30,108 +33,70 @@ const db = mysql.createConnection({
 });
 
 db.connect((err) => {
-  if (err) {
-    console.error("Database connection error:", err);
-  } else {
-    console.log("Connected to database");
-  }
+  if (err) console.error("Database connection error:", err);
+  else console.log("Connected to database");
 });
 
 function getAllUsers() {
   return new Promise((resolve, reject) => {
-    db.query("SELECT userId, role FROM users", (err, results) => {
-      if (err) {
-        reject(err);
-      } else {
-        const users = results.map((row) => ({ userId: row.userId, role: row.role }));
-        resolve(users);
-      }
+    db.query("SELECT userId, role, firstName, lastName FROM users", (err, results) => {
+      if (err) reject(err);
+      else resolve(results.map(row => ({
+        userId: row.userId,
+        role: row.role,
+        firstName: row.firstName,
+        lastName: row.lastName
+      })));
     });
   });
 }
 
-let users = {}; // Store users with their socket IDs and roles
+let users = {};
 let activeUsers = new Set();
-
-app.post("/set-role", (req, res) => {
-  const { userId, role } = req.body;
-  if (!userId || !role) {
-    return res.status(400).json({ message: "User ID and role are required" });
-  }
-  res.cookie("userRole", role, { httpOnly: true, sameSite: "Strict", maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.cookie("userId", userId, { httpOnly: true, sameSite: "Strict", maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.json({ message: "Role set in cookies" });
-});
-
-app.get("/get-role", (req, res) => {
-  const userRole = req.cookies.userRole;
-  const userId = req.cookies.userId;
-  if (!userRole || !userId) {
-    return res.status(400).json({ message: "No role found" });
-  }
-  res.json({ role: userRole, userId });
-});
 
 io.on("connection", (socket) => {
   console.log(`New connection from socket ID: ${socket.id}`);
 
   socket.on("join", async ({ userId, role }) => {
     console.log(`User ${userId} with role ${role} attempting to join`);
-    if (!userId || !role) {
-      console.error(`Invalid join data for socket ${socket.id}: userId=${userId}, role=${role}`);
-      return;
-    }
+    if (!userId || !role) return;
 
-    // Update users and activeUsers
     users[userId] = { socketId: socket.id, role };
     activeUsers.add(userId);
-    console.log(`Added ${userId} to activeUsers. Current activeUsers: ${Array.from(activeUsers)}`);
 
-    // Load messages for the joining user
     db.query(
       "SELECT sender, recipient, message, timestamp FROM messages WHERE sender = ? OR recipient = ? ORDER BY timestamp ASC",
       [userId, userId],
       (err, results) => {
-        if (err) {
-          console.error(`Error fetching messages for ${userId}:`, err);
-        } else {
-          console.log(`Fetched ${results.length} messages for ${userId}:`, results);
-          socket.emit("loadMessages", results);
-        }
+        if (err) console.error(`Error fetching messages for ${userId}:`, err);
+        else socket.emit("loadMessages", results);
       }
     );
 
     try {
       const allUsers = await getAllUsers();
-      const activeAdmins = Array.from(activeUsers).filter((id) => users[id]?.role === "admin");
-      const activeUsersForAdmin = Array.from(activeUsers).filter((id) => users[id]?.role === "user");
+      const activeRiders = Array.from(activeUsers).filter((id) => users[id]?.role === "rider");
+      const activeClients = Array.from(activeUsers).filter((id) => users[id]?.role === "client");
 
-      if (role === "admin") {
-        const userList = allUsers.filter((u) => u.role === "user").map((u) => u.userId);
-        socket.emit("allUsers", userList);
-        io.emit("activeUsersForAdmin", activeUsersForAdmin); // Broadcast to all admins
-        console.log(`Emitted to all admins: allUsers = ${userList}, activeUsersForAdmin = ${activeUsersForAdmin}`);
+      if (role === "rider") {
+        const clientList = allUsers.filter((u) => u.role === "client");
+        socket.emit("allClients", clientList);
+        io.emit("activeClients", activeClients);
       } else {
-        const adminList = allUsers.filter((u) => u.role === "admin").map((u) => u.userId);
-        socket.emit("availableAdmins", adminList);
-        io.emit("activeUsers", activeAdmins); // Broadcast to all users
-        console.log(`Emitted to all users: availableAdmins = ${adminList}, activeUsers = ${activeAdmins}`);
+        const riderList = allUsers.filter((u) => u.role === "rider");
+        socket.emit("availableRiders", riderList);
+        io.emit("activeRiders", activeRiders);
       }
 
-      // Broadcast updated active users to all clients
-      io.emit("activeUsers", activeAdmins); // Update all users
-      io.emit("activeUsersForAdmin", activeUsersForAdmin); // Update all admins
+      io.emit("activeRiders", activeRiders);
+      io.emit("activeClients", activeClients);
     } catch (err) {
       console.error(`Error fetching all users for ${userId}:`, err);
     }
   });
 
   socket.on("sendMessage", ({ sender, recipient, message }) => {
-    console.log(`Message from ${sender} to ${recipient}: ${message}`);
-    if (users[sender] && users[sender].role === "user" && users[recipient]?.role !== "admin") {
-      console.log(`Blocked message from ${sender} to ${recipient} due to role restriction`);
-      return;
-    }
+    if (users[sender]?.role === "client" && users[recipient]?.role !== "rider") return;
 
     const timestamp = new Date().toISOString();
     const newMessage = { sender, recipient, message, timestamp };
@@ -140,40 +105,30 @@ io.on("connection", (socket) => {
       "INSERT INTO messages (sender, recipient, message, timestamp) VALUES (?, ?, ?, ?)",
       [sender, recipient, message, timestamp],
       (err) => {
-        if (err) console.error(`Error saving message from ${sender} to ${recipient}:`, err);
+        if (err) console.error(`Error saving message:`, err);
       }
     );
 
-    if (users[recipient]) {
-      io.to(users[recipient].socketId).emit("receiveMessage", newMessage);
-      console.log(`Sent message to ${recipient} via socket ${users[recipient].socketId}: ${JSON.stringify(newMessage)}`);
-    }
-
-    if (users[sender]) {
-      io.to(users[sender].socketId).emit("receiveMessage", newMessage);
-      console.log(`Sent message to ${sender} via socket ${users[sender].socketId}: ${JSON.stringify(newMessage)}`);
-    }
+    if (users[recipient]) io.to(users[recipient].socketId).emit("receiveMessage", newMessage);
+    if (users[sender]) io.to(users[sender].socketId).emit("receiveMessage", newMessage);
   });
 
   socket.on("disconnect", () => {
-    console.log(`Socket ${socket.id} disconnected`);
     let disconnectedUserId = null;
     for (let userId in users) {
       if (users[userId].socketId === socket.id) {
         disconnectedUserId = userId;
         delete users[userId];
         activeUsers.delete(userId);
-        console.log(`Removed ${userId} from activeUsers. Current activeUsers: ${Array.from(activeUsers)}`);
         break;
       }
     }
 
     if (disconnectedUserId) {
-      const activeAdmins = Array.from(activeUsers).filter((id) => users[id]?.role === "admin");
-      const activeUsersForAdmin = Array.from(activeUsers).filter((id) => users[id]?.role === "user");
-      io.emit("activeUsers", activeAdmins); // Broadcast to all users
-      io.emit("activeUsersForAdmin", activeUsersForAdmin); // Broadcast to all admins
-      console.log(`Broadcasted updated active users: admins = ${activeAdmins}, users = ${activeUsersForAdmin}`);
+      const activeRiders = Array.from(activeUsers).filter((id) => users[id]?.role === "rider");
+      const activeClients = Array.from(activeUsers).filter((id) => users[id]?.role === "client");
+      io.emit("activeRiders", activeRiders);
+      io.emit("activeClients", activeClients);
     }
   });
 });
