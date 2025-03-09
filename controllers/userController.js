@@ -54,7 +54,6 @@ const registerOrLogin = async (req, res) => {
       userId: id,
       firstName,
       lastName,
-      username: `${firstName.toLowerCase()}${lastName.toLowerCase()}${id}`,
       role,
       created_at: new Date().toISOString()
     };

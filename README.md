@@ -75,6 +75,33 @@ npm start
 ```
 This will start the server on port 5000. You can access the application by visiting `http://localhost:5000` in your web browser.
 
+
+### sql
+CREATE TABLE users (
+  userId VARCHAR(50) PRIMARY KEY,
+  firstName VARCHAR(255) NOT NULL,
+  lastName VARCHAR(255) NOT NULL;
+  role ENUM('client', 'rider') NOT NULL,
+  last_synced DATETIME
+);
+
+
+CREATE TABLE messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sender VARCHAR(255) NOT NULL,
+  recipient VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  read_at DATETIME DEFAULT NULL,
+  FOREIGN KEY (sender) REFERENCES users(userId),
+  FOREIGN KEY (recipient) REFERENCES users(userId)
+);
+
+CREATE INDEX idx_sender ON messages(sender);
+CREATE INDEX idx_recipient ON messages(recipient);
+CREATE INDEX idx_timestamp ON messages(timestamp);
+
 **Deployment to cPanel**
 -------------------------
 

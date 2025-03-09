@@ -1,4 +1,3 @@
-// index.js
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -33,7 +32,7 @@ const db = mysql.createConnection({
 });
 
 db.connect((err) => {
-  if (err) console.error("Database connection error:", err);
+  if (err) console.error("Database connection error:", err.stack);
   else console.log("Connected to database");
 });
 
@@ -65,11 +64,14 @@ io.on("connection", (socket) => {
     activeUsers.add(userId);
 
     db.query(
-      "SELECT sender, recipient, message, timestamp FROM messages WHERE sender = ? OR recipient = ? ORDER BY timestamp ASC",
+      "SELECT id, sender, recipient, message, timestamp, is_read, read_at FROM messages WHERE sender = ? OR recipient = ? ORDER BY timestamp ASC",
       [userId, userId],
       (err, results) => {
-        if (err) console.error(`Error fetching messages for ${userId}:`, err);
-        else socket.emit("loadMessages", results);
+        if (err) {
+          console.error(`Error fetching messages for ${userId}:`, err.stack);
+          return;
+        }
+        socket.emit("loadMessages", results);
       }
     );
 
@@ -91,26 +93,62 @@ io.on("connection", (socket) => {
       io.emit("activeRiders", activeRiders);
       io.emit("activeClients", activeClients);
     } catch (err) {
-      console.error(`Error fetching all users for ${userId}:`, err);
+      console.error(`Error fetching all users for ${userId}:`, err.stack);
     }
   });
 
-  socket.on("sendMessage", ({ sender, recipient, message }) => {
+  socket.on("sendMessage", ({ sender, recipient, message, timestamp }) => {
     if (users[sender]?.role === "client" && users[recipient]?.role !== "rider") return;
 
-    const timestamp = new Date().toISOString();
-    const newMessage = { sender, recipient, message, timestamp };
+    const newMessage = { sender, recipient, message, timestamp, is_read: 0, read_at: null };
 
     db.query(
-      "INSERT INTO messages (sender, recipient, message, timestamp) VALUES (?, ?, ?, ?)",
-      [sender, recipient, message, timestamp],
-      (err) => {
-        if (err) console.error(`Error saving message:`, err);
+      "INSERT INTO messages (sender, recipient, message, timestamp, is_read, read_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [sender, recipient, message, timestamp, 0, null],
+      (err, result) => {
+        if (err) {
+          console.error(`Error saving message:`, err.stack);
+          return;
+        }
+        newMessage.id = result.insertId;
+        if (users[recipient]) io.to(users[recipient].socketId).emit("receiveMessage", newMessage);
+        if (users[sender]) io.to(users[sender].socketId).emit("receiveMessage", newMessage);
       }
     );
+  });
 
-    if (users[recipient]) io.to(users[recipient].socketId).emit("receiveMessage", newMessage);
-    if (users[sender]) io.to(users[sender].socketId).emit("receiveMessage", newMessage);
+  socket.on("markMessageRead", ({ messageId, read_at }) => {
+    if (!messageId || !read_at) {
+      console.error("Invalid markMessageRead data:", { messageId, read_at });
+      return;
+    }
+    db.query(
+      "UPDATE messages SET is_read = 1, read_at = ? WHERE id = ? AND is_read = 0",
+      [read_at, messageId],
+      (err, result) => {
+        if (err) {
+          console.error(`Error marking message ${messageId} as read:`, err.stack);
+          return;
+        }
+        if (result.affectedRows > 0) {
+          db.query(
+            "SELECT sender, recipient FROM messages WHERE id = ?",
+            [messageId],
+            (err, rows) => {
+              if (err) {
+                console.error(`Error fetching message ${messageId}:`, err.stack);
+                return;
+              }
+              const message = rows[0];
+              if (message) {
+                if (users[message.sender]) io.to(users[message.sender].socketId).emit("messageRead", { messageId, read_at });
+                if (users[message.recipient]) io.to(users[message.recipient].socketId).emit("messageRead", { messageId, read_at });
+              }
+            }
+          );
+        }
+      }
+    );
   });
 
   socket.on("disconnect", () => {
