@@ -1,4 +1,3 @@
-// stores.js
 import { create } from 'zustand';
 import io from 'socket.io-client';
 import { jwtDecode } from 'jwt-decode';
@@ -35,98 +34,192 @@ export const useAppStore = create((set) => ({
 
     try {
       const decoded = jwtDecode(token);
-      if (!decoded || !decoded.clientId) {
-        set({ errorMessage: 'Invalid JWT token', isLoading: false });
+      if (!decoded || (!decoded.clientId && !decoded.riderId)) {
+        set({ errorMessage: 'Invalid JWT token: Missing clientId or riderId', isLoading: false });
         return;
       }
 
-      const clientIdString = decoded.clientId;
-      const params = new URLSearchParams(clientIdString);
-      const fromClient = params.get('fromClient');
-      const toRider = params.get('toRider');
+      let role, userId, firstName, lastName, riderFirstName, riderLastName, riderUserId;
 
-      if (!fromClient || !toRider) {
-        set({ errorMessage: 'Missing fromClient or toRider in token', isLoading: false });
-        return;
-      }
+      if (decoded.riderId) {
+        // Handle Rider case
+        const riderIdString = decoded.riderId;
+        const params = new URLSearchParams(riderIdString);
+        const fromRider = params.get('fromRider');
+        const toClient = params.get('toClient');
 
-      const clientResponse = await axios.get(`https://api.bong2x.com/api/v1/clients/${fromClient}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const clientData = clientResponse.data;
-      if (!clientData.success || !clientData.data) {
-        set({ errorMessage: 'Invalid client data', isLoading: false });
-        return;
-      }
-      const clientRoleId = clientData.data.id;
-      const clientFirstName = clientData.data.client_name;
-      const clientLastName = 'client';
-
-      const riderResponse = await axios.get(`https://api.bong2x.com/api/v1/riders/${toRider}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const riderData = riderResponse.data;
-      if (!riderData.success || !riderData.data) {
-        set({ errorMessage: 'Invalid rider data', isLoading: false });
-        return;
-      }
-      const riderRoleId = riderData.data.id;
-      const riderFirstName = riderData.data.first_name;
-      const riderLastName = riderData.data.last_name;
-
-      const clientRegisterResponse = await axios.post(
-        'http://localhost:5000/api/users/register-or-login',
-        {
-          roleId: clientRoleId,
-          firstName: clientFirstName,
-          lastName: clientLastName,
-          role: 'client',
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-          withCredentials: true,
+        if (!fromRider || !toClient) {
+          set({ errorMessage: 'Missing fromRider or toClient in token', isLoading: false });
+          return;
         }
-      );
-      if (clientRegisterResponse.status !== 200 && clientRegisterResponse.status !== 201) {
-        set({ errorMessage: clientRegisterResponse.data.message || 'Client registration/login failed', isLoading: false });
-        return;
-      }
-      const clientUserId = clientRegisterResponse.data.user.userId;
 
-      const riderRegisterResponse = await axios.post(
-        'http://localhost:5000/api/users/register-or-login',
-        {
-          roleId: riderRoleId,
-          firstName: riderFirstName,
-          lastName: riderLastName,
-          role: 'rider',
-        },
-        {
+        // Fetch rider data
+        const riderResponse = await axios.get(`https://api.bong2x.com/api/v1/riders/${fromRider}`, {
           headers: { 'Content-Type': 'application/json' },
-          withCredentials: true,
+        });
+        const riderData = riderResponse.data;
+        if (!riderData.success || !riderData.data) {
+          set({ errorMessage: 'Invalid rider data', isLoading: false });
+          return;
         }
-      );
-      if (riderRegisterResponse.status !== 200 && riderRegisterResponse.status !== 201) {
-        set({ errorMessage: riderRegisterResponse.data.message || 'Rider registration/login failed', isLoading: false });
-        return;
-      }
-      const riderUserId = riderRegisterResponse.data.user.userId;
+        const riderRoleId = riderData.data.id;
+        const riderFirstNameData = riderData.data.first_name;
+        const riderLastNameData = riderData.data.last_name;
 
-      let id = clientUserId;
-      let role = 'client';
-      let firstName = clientFirstName;
-      let lastName = clientLastName;
+        // Fetch client data
+        const clientResponse = await axios.get(`https://api.bong2x.com/api/v1/clients/${toClient}`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const clientData = clientResponse.data;
+        if (!clientData.success || !clientData.data) {
+          set({ errorMessage: 'Invalid client data', isLoading: false });
+          return;
+        }
+        const clientRoleId = clientData.data.id;
+        const clientFirstName = clientData.data.client_name;
+        const clientLastName = 'client';
+
+        // Register or login rider
+        const riderRegisterResponse = await axios.post(
+          'http://localhost:5000/api/users/register-or-login',
+          {
+            roleId: riderRoleId,
+            firstName: riderFirstNameData,
+            lastName: riderLastNameData,
+            role: 'rider',
+          },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true,
+          }
+        );
+        if (riderRegisterResponse.status !== 200 && riderRegisterResponse.status !== 201) {
+          set({ errorMessage: riderRegisterResponse.data.message || 'Rider registration/login failed', isLoading: false });
+          return;
+        }
+        const riderUserIdData = riderRegisterResponse.data.user.userId;
+
+        // Register or login client
+        const clientRegisterResponse = await axios.post(
+          'http://localhost:5000/api/users/register-or-login',
+          {
+            roleId: clientRoleId,
+            firstName: clientFirstName,
+            lastName: clientLastName,
+            role: 'client',
+          },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true,
+          }
+        );
+        if (clientRegisterResponse.status !== 200 && clientRegisterResponse.status !== 201) {
+          set({ errorMessage: clientRegisterResponse.data.message || 'Client registration/login failed', isLoading: false });
+          return;
+        }
+        const clientUserId = clientRegisterResponse.data.user.userId;
+
+        // Set as Rider perspective
+        role = 'rider';
+        userId = riderUserIdData;
+        firstName = riderFirstNameData;
+        lastName = riderLastNameData;
+        riderFirstName = clientFirstName; // Client becomes the "rider" in RiderChat props
+        riderLastName = clientLastName;
+        riderUserId = clientUserId;
+      } else if (decoded.clientId) {
+        // Handle Client case
+        const clientIdString = decoded.clientId;
+        const params = new URLSearchParams(clientIdString);
+        const fromClient = params.get('fromClient');
+        const toRider = params.get('toRider');
+
+        if (!fromClient || !toRider) {
+          set({ errorMessage: 'Missing fromClient or toRider in token', isLoading: false });
+          return;
+        }
+
+        const clientResponse = await axios.get(`https://api.bong2x.com/api/v1/clients/${fromClient}`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const clientData = clientResponse.data;
+        if (!clientData.success || !clientData.data) {
+          set({ errorMessage: 'Invalid client data', isLoading: false });
+          return;
+        }
+        const clientRoleId = clientData.data.id;
+        const clientFirstName = clientData.data.client_name;
+        const clientLastName = 'client';
+
+        const riderResponse = await axios.get(`https://api.bong2x.com/api/v1/riders/${toRider}`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const riderData = riderResponse.data;
+        if (!riderData.success || !riderData.data) {
+          set({ errorMessage: 'Invalid rider data', isLoading: false });
+          return;
+        }
+        const riderRoleId = riderData.data.id;
+        const riderFirstNameData = riderData.data.first_name;
+        const riderLastNameData = riderData.data.last_name;
+
+        const clientRegisterResponse = await axios.post(
+          'http://localhost:5000/api/users/register-or-login',
+          {
+            roleId: clientRoleId,
+            firstName: clientFirstName,
+            lastName: clientLastName,
+            role: 'client',
+          },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true,
+          }
+        );
+        if (clientRegisterResponse.status !== 200 && clientRegisterResponse.status !== 201) {
+          set({ errorMessage: clientRegisterResponse.data.message || 'Client registration/login failed', isLoading: false });
+          return;
+        }
+        const clientUserId = clientRegisterResponse.data.user.userId;
+
+        const riderRegisterResponse = await axios.post(
+          'http://localhost:5000/api/users/register-or-login',
+          {
+            roleId: riderRoleId,
+            firstName: riderFirstNameData,
+            lastName: riderLastNameData,
+            role: 'rider',
+          },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true,
+          }
+        );
+        if (riderRegisterResponse.status !== 200 && riderRegisterResponse.status !== 201) {
+          set({ errorMessage: riderRegisterResponse.data.message || 'Rider registration/login failed', isLoading: false });
+          return;
+        }
+        const riderUserIdData = riderRegisterResponse.data.user.userId;
+
+        role = 'client';
+        userId = clientUserId;
+        firstName = clientFirstName;
+        lastName = clientLastName;
+        riderFirstName = riderFirstNameData;
+        riderLastName = riderLastNameData;
+        riderUserId = riderUserIdData;
+      }
 
       const newSocket = io('http://localhost:5000', { withCredentials: true });
       newSocket.on('connect', () => {
-        console.log(`Joining with userId: ${id}, role: ${role}`);
-        newSocket.emit('join', { userId: id, role });
+        console.log(`Joining with userId: ${userId}, role: ${role}`);
+        newSocket.emit('join', { userId, role });
       });
 
       set({
         socket: newSocket,
         role,
-        userId: id,
+        userId,
         firstName,
         lastName,
         riderFirstName,

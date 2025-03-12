@@ -1,8 +1,8 @@
-// App.jsx
 import { useEffect } from 'react';
 import { useAppStore } from './stores';
 import ClientChat from './ClientChat';
 import RiderChat from './RiderChat';
+import Layout from './Layout'; // Import the new Layout component
 
 const App = () => {
   const {
@@ -26,43 +26,56 @@ const App = () => {
   }, [initializeApp, disconnectSocket]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-xl">Loading...</div>
+        </div>
+      </Layout>
+    );
   }
 
   if (!role) {
     return (
-      <div className="p-4 max-w-md mx-auto">
-        <div className="text-red-500">Invalid URL parameters: {errorMessage}</div>
-      </div>
+      <Layout>
+        <div className="mx-auto mt-8">
+          <div className="text-red-500 bg-red-100 p-4 rounded-lg shadow">
+            <h2 className="font-semibold mb-2">Error</h2>
+            <p>Invalid URL parameters: {errorMessage}</p>
+          </div>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      {role === 'rider' ? (
-        <RiderChat
-          socket={socket}
-          userId={userId}
-          role={role}
-          firstName={firstName}
-          lastName={lastName}
-          clientFirstName={riderFirstName} // Assuming rider chats with client
-          clientLastName={riderLastName}
-          clientUserId={riderUserId}
-        />
-      ) : (
-        <ClientChat
-          socket={socket}
-          userId={userId}
-          role={role}
-          firstName={firstName}
-          lastName={lastName}
-          riderFirstName={riderFirstName}
-          riderLastName={riderLastName}
-          riderUserId={riderUserId}
-        />
-      )}
-    </div>
+    <Layout>
+      <div className="h[100] mx-auto">
+        {role === 'rider' ? (
+          <RiderChat
+            socket={socket}
+            userId={userId}
+            role={role}
+            firstName={firstName}
+            lastName={lastName}
+            clientFirstName={riderFirstName} // Assuming rider chats with client
+            clientLastName={riderLastName}
+            clientUserId={riderUserId}
+          />
+        ) : (
+          <ClientChat
+            socket={socket}
+            userId={userId}
+            role={role}
+            firstName={firstName}
+            lastName={lastName}
+            riderFirstName={riderFirstName}
+            riderLastName={riderLastName}
+            riderUserId={riderUserId}
+          />
+        )}
+      </div>
+    </Layout>
   );
 };
 

@@ -1,7 +1,8 @@
-// ClientChat.jsx
 import { useEffect, useRef } from 'react';
 import { useChatStore } from './stores';
-import { formatTimestamp, formatRelativeTime } from './utils/formatTimestamp';
+import { formatTimestamp } from './utils/formatTimestamp'; // Keep this for other timestamp formatting
+import { formatDistanceToNow } from 'date-fns'; // Import date-fns
+import { ArrowLeft, User } from 'lucide-react';
 
 export default function ClientChat({ socket, userId, role, firstName, lastName, riderFirstName, riderLastName, riderUserId }) {
   const {
@@ -31,28 +32,12 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
     socket.emit('join', { userId, role });
 
     socket.on('activeRiders', setActiveUsers);
-    socket.on('availableRiders', (riders) => {
-      console.log('Received availableRiders:', riders); // Debug log
-      setAllUsers(riders);
-    });
-    socket.on('loadMessages', (loadedMessages) => {
-      console.log('Loaded messages:', loadedMessages); // Debug log
-      setMessages(loadedMessages || []);
-    });
-    socket.on('receiveMessage', (msg) => {
-      console.log('Received message:', msg); // Debug log
-      addMessage(msg);
-    });
-    socket.on('messageRead', ({ messageId, read_at }) => {
-      console.log('Message read:', { messageId, read_at }); // Debug log
-      updateMessageRead(messageId, read_at);
-    });
+    socket.on('availableRiders', (riders) => setAllUsers(riders));
+    socket.on('loadMessages', (loadedMessages) => setMessages(loadedMessages || []));
+    socket.on('receiveMessage', addMessage);
+    socket.on('messageRead', ({ messageId, read_at }) => updateMessageRead(messageId, read_at));
 
-    // Automatically select the rider from props after initialization
-    if (riderUserId && !selectedUser) {
-      console.log('Auto-selecting rider:', riderUserId); // Debug log
-      setSelectedUser(riderUserId);
-    }
+    if (riderUserId && !selectedUser) setSelectedUser(riderUserId);
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -77,17 +62,8 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
   }, [messages, selectedUser, socket, userId]);
 
   const sendMessage = () => {
-    if (!message.trim() || !selectedUser) {
-      console.log('Cannot send message: missing message or selectedUser'); // Debug log
-      return;
-    }
-    const msg = {
-      sender: userId,
-      recipient: selectedUser,
-      message,
-      timestamp: new Date().toISOString(),
-    };
-    console.log('Emitting sendMessage:', msg); // Debug log
+    if (!message.trim() || !selectedUser) return;
+    const msg = { sender: userId, recipient: selectedUser, message, timestamp: new Date().toISOString() };
     socket.emit('sendMessage', msg);
     setMessage('');
   };
@@ -104,21 +80,15 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-gray-100 p-1 sm:p-2 md:p-4">
-      <div className="w-full max-w-screen-xl h-full md:h-[90vh] bg-white shadow-lg rounded-lg flex flex-col">
-        <div className="p-2 sm:p-3 md:p-4 border-b bg-gray-200 text-base sm:text-lg font-bold text-center relative flex items-center justify-center">
+    <div className="relative w-full flex items-center justify-center bg-gray-100 p-1 sm:p-2 md:p-4">
+      <div className="w-full max-w-screen-xl h-[80vh] bg-white shadow-lg rounded-lg flex flex-col">
+        <div className="p-2 sm:p-3 md:p-4 border-b bg-[#e75951] text-white text-base sm:text-lg font-bold text-center relative flex items-center justify-center">
           {selectedUser && isMobileView && (
             <button
               onClick={() => setSelectedUser(null)}
-              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-300 transition"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-[#d14e47] transition"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <ArrowLeft className="h-5 w-5" />
             </button>
           )}
           <span className="truncate max-w-[60%] sm:max-w-[80%]">
@@ -144,11 +114,14 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
                       <div
                         key={rider.userId}
                         className={`p-2 sm:p-3 cursor-pointer rounded-lg flex items-center justify-between transition ${
-                          selectedUser === rider.userId ? 'bg-blue-500 text-white' : 'hover:bg-gray-200'
+                          selectedUser === rider.userId ? 'bg-[#e75951] text-white' : 'hover:bg-gray-200'
                         }`}
                         onClick={() => setSelectedUser(rider.userId)}
                       >
                         <div className="flex items-center">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-400 flex items-center justify-center text-white mr-2">
+                            <User className="h-5 w-5 sm:h-6 sm:w-6" />
+                          </div>
                           <span
                             className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-2 ${
                               activeUsers.includes(rider.userId) ? 'bg-green-500' : 'bg-gray-400'
@@ -157,7 +130,7 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
                           <span className="truncate text-sm sm:text-base">{`${rider.firstName} ${rider.lastName}`}</span>
                         </div>
                         {unreadCount > 0 && (
-                          <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1">{unreadCount}</span>
+                          <span className="bg-[#e75951] text-white text-xs rounded-full px-2 py-1">{unreadCount}</span>
                         )}
                       </div>
                     );
@@ -188,12 +161,14 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
                     >
                       <div
                         className={`max-w-[85%] p-2 sm:p-3 rounded-lg shadow-md break-words ${
-                          msg.sender === userId ? 'bg-blue-500 text-white' : 'bg-gray-300 text-black'
+                          msg.sender === userId ? 'bg-[#e75951] text-white' : 'bg-gray-300 text-black'
                         }`}
                       >
                         <p className="text-xs sm:text-sm md:text-base">{msg.message}</p>
                         {msg.is_read === 1 && msg.sender === userId && (
-                          <p className="text-xs text-gray-200 mt-1">{formatRelativeTime(msg.read_at)}</p>
+                          <p className="text-xs text-gray-200 mt-1">
+                            Seen {formatDistanceToNow(new Date(msg.read_at), { addSuffix: true })}
+                          </p>
                         )}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">{formatTimestamp(msg.timestamp)}</p>
@@ -211,7 +186,7 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
               <div className="p-2 sm:p-3 md:p-4 border-t bg-gray-50">
                 <div className="flex gap-1 sm:gap-2">
                   <input
-                    className="flex-1 p-1 sm:p-2 text-sm sm:text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 p-1 sm:p-2 text-sm sm:text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e75951]"
                     type="text"
                     placeholder="Type a message..."
                     value={message}
@@ -219,7 +194,7 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
                     onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                   />
                   <button
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-2 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors text-sm sm:text-base"
+                    className="bg-[#e75951] hover:bg-[#d14e47] text-white px-2 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors text-sm sm:text-base"
                     onClick={sendMessage}
                   >
                     Send
