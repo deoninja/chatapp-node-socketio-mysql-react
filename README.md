@@ -33,20 +33,29 @@ CREATE DATABASE chat_db;
 USE chat_db;
 
 CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'user') NOT NULL
+  userId VARCHAR(255) PRIMARY KEY,
+  roleId INT NOT NULL,
+  firstName VARCHAR(255) NOT NULL,
+  lastName VARCHAR(255) NOT NULL,
+  role ENUM('rider', 'client') NOT NULL,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE messages (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  sender VARCHAR(255),
-  recipient VARCHAR(255),
-  message TEXT,
-  is_read BOOLEAN DEFAULT FALSE,
-  read_at TIMESTAMP NULL DEFAULT NULL,
-  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  sender VARCHAR(255) NOT NULL,
+  recipient VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_read TINYINT DEFAULT 0,
+  read_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (sender) REFERENCES users(userId),
+  FOREIGN KEY (recipient) REFERENCES users(userId)
 );
+
+CREATE INDEX idx_sender ON messages(sender);
+CREATE INDEX idx_recipient ON messages(recipient);
+CREATE INDEX idx_timestamp ON messages(timestamp);
 
 -- Add sample admin and users
 INSERT INTO users (username, role) VALUES 
@@ -76,31 +85,8 @@ npm start
 This will start the server on port 5000. You can access the application by visiting `http://localhost:5000` in your web browser.
 
 
-### sql
-CREATE TABLE users (
-  userId VARCHAR(50) PRIMARY KEY,
-  firstName VARCHAR(255) NOT NULL,
-  lastName VARCHAR(255) NOT NULL;
-  role ENUM('client', 'rider') NOT NULL,
-  last_synced DATETIME
-);
 
 
-CREATE TABLE messages (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  sender VARCHAR(255) NOT NULL,
-  recipient VARCHAR(255) NOT NULL,
-  message TEXT NOT NULL,
-  timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  is_read BOOLEAN NOT NULL DEFAULT FALSE,
-  read_at DATETIME DEFAULT NULL,
-  FOREIGN KEY (sender) REFERENCES users(userId),
-  FOREIGN KEY (recipient) REFERENCES users(userId)
-);
-
-CREATE INDEX idx_sender ON messages(sender);
-CREATE INDEX idx_recipient ON messages(recipient);
-CREATE INDEX idx_timestamp ON messages(timestamp);
 
 **Deployment to cPanel**
 -------------------------

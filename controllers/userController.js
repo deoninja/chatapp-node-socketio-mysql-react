@@ -1,6 +1,7 @@
 // controllers/userController.js
 const mysql = require('mysql');
 require('dotenv').config();
+const { v4: uuidv4 } = require('uuid'); // Add uuid package for unique IDs
 
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
@@ -9,39 +10,63 @@ const db = mysql.createConnection({
   database: process.env.DB_NAME,
 });
 
-db.connect((err) => {
-  if (err) console.error("Database connection error:", err);
-  else console.log("Connected to database");
-});
+const connectDb = () => {
+  return new Promise((resolve, reject) => {
+    db.connect((err) => {
+      if (err) {
+        console.error("Database connection error:", err.stack);
+        reject(err);
+      } else {
+        console.log("Connected to database");
+        resolve();
+      }
+    });
+  });
+};
+
+let isDbConnected = false;
+connectDb()
+  .then(() => { isDbConnected = true; })
+  .catch((err) => { isDbConnected = false; });
 
 const registerOrLogin = async (req, res) => {
-  const { id, firstName, lastName, role } = req.body;
+  const { roleId, firstName, lastName, role } = req.body;
 
-  if (!id || !firstName || !lastName || !role) {
-    return res.status(400).json({ message: "ID, firstName, lastName, and role are required" });
+  if (!roleId || !firstName || !lastName || !role) {
+    return res.status(400).json({ message: "roleId, firstName, lastName, and role are required" });
   }
 
   if (!["rider", "client"].includes(role)) {
     return res.status(400).json({ message: "Role must be either 'rider' or 'client'" });
   }
 
+  if (!isDbConnected) {
+    return res.status(500).json({ message: "Database connection failed", error: "Unable to connect to the database" });
+  }
+
   try {
-    // Check if user already exists
+    await new Promise((resolve, reject) => {
+      db.ping((err) => {
+        if (err) reject(new Error("Database connection lost"));
+        else resolve();
+      });
+    });
+
     const existingUser = await new Promise((resolve, reject) => {
-      db.query("SELECT * FROM users WHERE userId = ?", [id], (err, results) => {
+      db.query("SELECT * FROM users WHERE roleId = ? AND role = ?", [roleId, role], (err, results) => {
         if (err) reject(err);
         else resolve(results[0]);
       });
     });
 
     if (existingUser) {
-      // User exists, login
       res.cookie("userRole", existingUser.role, { httpOnly: true, sameSite: "Strict", maxAge: 7 * 24 * 60 * 60 * 1000 });
       res.cookie("userId", existingUser.userId, { httpOnly: true, sameSite: "Strict", maxAge: 7 * 24 * 60 * 60 * 1000 });
       return res.status(200).json({
         message: "Login successful",
         user: {
           userId: existingUser.userId,
+          roleId: existingUser.roleId,
           firstName: existingUser.firstName,
           lastName: existingUser.lastName,
           role: existingUser.role
@@ -49,16 +74,19 @@ const registerOrLogin = async (req, res) => {
       });
     }
 
-    // New user, register
+    // Generate a unique userId (e.g., UUID or incremental ID)
+    const newUserId = uuidv4(); // Or use another method to generate a unique ID
+
     const newUser = {
-      userId: id,
+      userId: newUserId, // Explicitly include userId
+      roleId,
       firstName,
       lastName,
       role,
       created_at: new Date().toISOString()
     };
 
-    await new Promise((resolve, reject) => {
+    const result = await new Promise((resolve, reject) => {
       db.query("INSERT INTO users SET ?", newUser, (err, result) => {
         if (err) reject(err);
         else resolve(result);
@@ -66,23 +94,37 @@ const registerOrLogin = async (req, res) => {
     });
 
     res.cookie("userRole", role, { httpOnly: true, sameSite: "Strict", maxAge: 7 * 24 * 60 * 60 * 1000 });
-    res.cookie("userId", id, { httpOnly: true, sameSite: "Strict", maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie("userId", newUserId, { httpOnly: true, sameSite: "Strict", maxAge: 7 * 24 * 60 * 60 * 1000 });
     
     res.status(201).json({
       message: "Registration successful",
       user: {
-        userId: id,
+        userId: newUserId,
+        roleId,
         firstName,
         lastName,
         role
       }
     });
   } catch (error) {
-    console.error("Error in registerOrLogin:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error in registerOrLogin:", error.stack);
+    let errorMessage = "Internal server error";
+    if (error.message === "Database connection lost") {
+      errorMessage = "Database connection lost. Please try again later.";
+    } else if (error.code === "ER_ACCESS_DENIED_ERROR") {
+      errorMessage = "Database access denied. Check server configuration.";
+    } else if (error.code === "ER_NO_SUCH_TABLE") {
+      errorMessage = "Database table 'users' not found.";
+    } else if (error.code === "ER_NO_DEFAULT_FOR_FIELD") {
+      errorMessage = "Database schema error: 'userId' requires a value.";
+    } else {
+      errorMessage = error.message;
+    }
+    res.status(500).json({
+      message: errorMessage,
+      error: error.message
+    });
   }
 };
 
-module.exports = {
-  registerOrLogin
-};
+module.exports = { registerOrLogin };

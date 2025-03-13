@@ -1,5 +1,5 @@
 import React from 'react';
-import logo from './assets/onegailogo.jpg';
+import logo from './assets/bong2x.png';
 
 const Layout = ({ children }) => {
   return (
@@ -23,7 +23,7 @@ const Header = () => {
               className='h-8 w-8 sm:h-10 sm:w-10 rounded-full border-2 border-white-400 glow-effect'
             />
             <h1 className='ml-2 text-lg sm:text-xl md:text-2xl font-bold text-white-300 tracking-wide glow-text'>
-              Onegai Chat
+              Bong2x Chat
             </h1>
           </div>
 
@@ -112,7 +112,7 @@ const Footer = () => {
         <div className='py-4 sm:py-6 md:flex md:items-center md:justify-between'>
           <div className='text-center md:text-left mb-4 md:mb-0'>
             <p className='text-sm sm:text-base'>
-              &copy; {new Date().getFullYear()} Onegai Chat. All rights reserved.
+              &copy; {new Date().getFullYear()} Bong2x Chat. All rights reserved.
             </p>
           </div>
 
@@ -166,7 +166,7 @@ const Footer = () => {
         <div className='border-t border-gray-700 py-3 text-xs sm:text-sm text-gray-400 text-center md:text-left'>
           <div className='flex flex-col md:flex-row md:justify-between space-y-2 md:space-y-0'>
             <p>Terms of Service | Privacy Policy</p>
-            <p>Contact: support@riderchat.com</p>
+            <p>Contact: support@bong2x.com</p>
           </div>
         </div>
       </div>

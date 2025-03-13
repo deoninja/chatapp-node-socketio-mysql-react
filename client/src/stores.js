@@ -81,7 +81,7 @@ export const useAppStore = create((set) => ({
 
         // Register or login rider
         const riderRegisterResponse = await axios.post(
-          'http://localhost:5000/api/users/register-or-login',
+          'https://chat.bong2x.com/api/users/register-or-login',
           {
             roleId: riderRoleId,
             firstName: riderFirstNameData,
@@ -101,7 +101,7 @@ export const useAppStore = create((set) => ({
 
         // Register or login client
         const clientRegisterResponse = await axios.post(
-          'http://localhost:5000/api/users/register-or-login',
+          'https://chat.bong2x.com/api/users/register-or-login',
           {
             roleId: clientRoleId,
             firstName: clientFirstName,
@@ -164,7 +164,7 @@ export const useAppStore = create((set) => ({
         const riderLastNameData = riderData.data.last_name;
 
         const clientRegisterResponse = await axios.post(
-          'http://localhost:5000/api/users/register-or-login',
+          'https://chat.bong2x.com/api/users/register-or-login',
           {
             roleId: clientRoleId,
             firstName: clientFirstName,
@@ -183,7 +183,7 @@ export const useAppStore = create((set) => ({
         const clientUserId = clientRegisterResponse.data.user.userId;
 
         const riderRegisterResponse = await axios.post(
-          'http://localhost:5000/api/users/register-or-login',
+          'https://chat.bong2x.com/api/users/register-or-login',
           {
             roleId: riderRoleId,
             firstName: riderFirstNameData,
@@ -210,7 +210,7 @@ export const useAppStore = create((set) => ({
         riderUserId = riderUserIdData;
       }
 
-      const newSocket = io('http://localhost:5000', { withCredentials: true });
+      const newSocket = io('https://chat.bong2x.com', { withCredentials: true });
       newSocket.on('connect', () => {
         console.log(`Joining with userId: ${userId}, role: ${role}`);
         newSocket.emit('join', { userId, role });
