@@ -8,6 +8,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const userRoutes = require('./routes/userRoutes');
+const {formatDateForMySQL} = require('./helper/dateFormatter')
 
 const pHost = process.env.PUBLIC_HOST;
 
@@ -169,7 +170,7 @@ io.on("connection", (socket) => {
     }
     db.query(
       "UPDATE messages SET is_read = 1, read_at = ? WHERE id = ? AND is_read = 0",
-      [read_at, messageId],
+      [read_at, messageId], // Store the exact string from client
       (err, result) => {
         if (err) {
           console.error(`Error marking message ${messageId} as read:`, err.stack);
@@ -186,6 +187,7 @@ io.on("connection", (socket) => {
               }
               const message = rows[0];
               if (message) {
+                // Emit the original read_at value back
                 if (users[message.sender]) io.to(users[message.sender].socketId).emit("messageRead", { messageId, read_at });
                 if (users[message.recipient]) io.to(users[message.recipient].socketId).emit("messageRead", { messageId, read_at });
               }

@@ -20,7 +20,7 @@ const Header = () => {
             <img
               src={logo}
               alt='Logo'
-              className='h-8 w-8 sm:h-10 sm:w-10 rounded-full border-2 border-white-400 glow-effect'
+              className='h-8 w-8 sm:h-10 sm:w-10'
             />
             <h1 className='ml-2 text-lg sm:text-xl md:text-2xl font-bold text-white-300 tracking-wide glow-text'>
               Bong2x Chat

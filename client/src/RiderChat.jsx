@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useChatStore } from './stores';
 import { formatTimestamp } from './utils/formatTimestamp'; // Keep this for other timestamp formatting
-import { formatDistanceToNow } from 'date-fns'; // Import date-fns
+import { formatDistanceToNow, format } from 'date-fns'; // Import date-fns
 import { ArrowLeft, User } from 'lucide-react';
 
 export default function RiderChat({ socket, userId, role, firstName, lastName }) {
@@ -54,14 +54,18 @@ export default function RiderChat({ socket, userId, role, firstName, lastName })
         (msg) => msg.recipient === userId && msg.sender === selectedUser && !msg.is_read
       );
       unreadMessages.forEach((msg) => {
-        socket.emit('markMessageRead', { messageId: msg.id, read_at: new Date().toISOString() });
+        const now = new Date();
+        socket.emit('markMessageRead', { 
+          messageId: msg.id, 
+          read_at: format(now, 'yyyy-MM-dd HH:mm:ss') // Store as local time string
+        });
       });
     }
   }, [messages, selectedUser, socket, userId]);
 
   const sendMessage = () => {
     if (!message.trim() || !selectedUser) return;
-    const timestamp = new Date().toISOString();
+    const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
     const newMessage = { sender: userId, recipient: selectedUser, message, timestamp, is_read: 0 };
     socket.emit('sendMessage', newMessage);
     setMessage('');
@@ -166,7 +170,7 @@ export default function RiderChat({ socket, userId, role, firstName, lastName })
                         <p className="text-xs sm:text-sm md:text-base">{msg.message}</p>
                         {msg.is_read === 1 && msg.sender === userId && (
                           <p className="text-xs text-gray-200 mt-1">
-                            Seen {formatDistanceToNow(new Date(msg.read_at), { addSuffix: true })}
+                            Seen {formatDistanceToNow(format(msg.read_at, 'yyyy-MM-dd HH:mm:ss'), { addSuffix: true })}
                           </p>
                         )}
                       </div>

@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useChatStore } from './stores';
 import { formatTimestamp } from './utils/formatTimestamp'; // Keep this for other timestamp formatting
-import { formatDistanceToNow } from 'date-fns'; // Import date-fns
+import { formatDistanceToNow, format } from 'date-fns'; // Import date-fns
 import { ArrowLeft, User } from 'lucide-react';
+
 
 export default function ClientChat({ socket, userId, role, firstName, lastName, riderFirstName, riderLastName, riderUserId }) {
   const {
@@ -23,6 +24,8 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
   } = useChatStore();
 
   const messagesEndRef = useRef(null);
+
+
 
   useEffect(() => {
     const handleResize = () => setIsMobileView(window.innerWidth < 768);
@@ -56,14 +59,18 @@ export default function ClientChat({ socket, userId, role, firstName, lastName, 
         (msg) => msg.recipient === userId && msg.sender === selectedUser && !msg.is_read
       );
       unreadMessages.forEach((msg) => {
-        socket.emit('markMessageRead', { messageId: msg.id, read_at: new Date().toISOString() });
+        const now = new Date();
+        socket.emit('markMessageRead', { 
+          messageId: msg.id, 
+          read_at: format(now, 'yyyy-MM-dd HH:mm:ss') // Store as local time string
+        });
       });
     }
   }, [messages, selectedUser, socket, userId]);
 
   const sendMessage = () => {
     if (!message.trim() || !selectedUser) return;
-    const msg = { sender: userId, recipient: selectedUser, message, timestamp: new Date().toISOString() };
+    const msg = { sender: userId, recipient: selectedUser, message, timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss')};
     socket.emit('sendMessage', msg);
     setMessage('');
   };

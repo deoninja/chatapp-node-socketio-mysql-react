@@ -38,7 +38,7 @@ CREATE TABLE users (
   firstName VARCHAR(255) NOT NULL,
   lastName VARCHAR(255) NOT NULL,
   role ENUM('rider', 'client') NOT NULL,
-  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE messages (
@@ -46,9 +46,9 @@ CREATE TABLE messages (
   sender VARCHAR(255) NOT NULL,
   recipient VARCHAR(255) NOT NULL,
   message TEXT NOT NULL,
-  timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_read TINYINT DEFAULT 0,
-  read_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sender) REFERENCES users(userId),
   FOREIGN KEY (recipient) REFERENCES users(userId)
 );
